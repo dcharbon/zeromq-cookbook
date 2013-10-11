@@ -21,10 +21,21 @@
 
 include_recipe "build-essential"
 
+def template(str, args)
+    str.gsub(/%\{(.*?)\}/) { args[$1.to_sym] }
+end
+
 zeromq_tar_gz = File.join(Chef::Config[:file_cache_path], "/", "zeromq-#{node[:zeromq][:src_version]}.tar.gz")
 
+src_mirror_url = template(
+  node[:zeromq][:src_mirror], {:src_version => node[:zeromq][:src_version] }
+)
+install_dir = template(
+  node[:zeromq][:install_dir], {:src_version => node[:zeromq][:src_version]}
+)
+
 remote_file zeromq_tar_gz do
-  source node[:zeromq][:src_mirror]
+  source src_mirror_url
 end
 
 package "uuid-dev" do
@@ -35,9 +46,9 @@ bash "install zeromq #{node[:zeromq][:src_version]}" do
   cwd Chef::Config[:file_cache_path]
   code <<-EOH
     tar -zxf #{zeromq_tar_gz}
-    cd zeromq-#{node[:zeromq][:src_version]} && ./configure --prefix=#{node[:zeromq][:install_dir]} && make && make install
+    cd zeromq-#{node[:zeromq][:src_version]} && ./configure --prefix=#{install_dir} && make && make install
     echo -e "/opt/zeromq-#{node[:zeromq][:src_version]}/lib\\n" > /etc/ld.so.conf.d/#{node[:zeromq][:src_version]}.conf
     ldconfig
   EOH
-  not_if { ::FileTest.exists?("#{node[:zeromq][:install_dir]}/lib/libzmq.so") }
+  not_if { ::FileTest.exists?("#{install_dir}/lib/libzmq.so") }
 end
